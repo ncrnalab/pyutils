@@ -41,17 +41,19 @@ class gtf2_info (object):
                     fgtf.seek (int(pos))
 
                     columns = fgtf.readline().strip().split ("\t")
+
                     
                     chrom, feature, start, end, strand, info = columns[0], columns[2], columns[3], columns[4], columns[6], columns[8]
 
+                    
                     if feature == self.feature:
                         
                         nlines += 1
                         yield {"id": id, "chrom":chrom, "start":int(start), "end":int(end), "strand":strand, "info":info}
                         
 
-        if nlines == 0:
-            yield {"id": "N/A", "chrom": "N/A", "start":-1, "end":-1, "strand":"N/A", "info":"N/A"}
+        #if nlines == 0:
+        #    yield {"id": "N/A", "chrom": "N/A", "start":-1, "end":-1, "strand":"N/A", "info":"N/A"}
                         
 
     def get_start (self):
@@ -82,8 +84,6 @@ class gtf2_info (object):
 
         return (exons_s, exons_e)
 
-    
-
     def get_introns (self):
         
         exons_s, exons_e = self.get_exons ()
@@ -93,12 +93,25 @@ class gtf2_info (object):
 
         return (introns_s, introns_e)
 
+    def get_length (self):
+        return len([info for info in self.get_info ()])
+
+    def print (self, feature):
+
+        for info in self.get_info ():
+            self.print_info (info, feature)
+
+    
+    def print_info (self, info, feature):
+            print ("\t".join ([info['chrom'], "gtf2", feature, str (info['start']), str(info['end']), ".", info['strand'], ".", info['info']]))
+
 
 
 class gtf2 (object):
 
-    def __init__ (self, gtf_file, head = -1):
+    def __init__ (self, gtf_file, head = -1, verbose = 0):
 
+        self.verbose = verbose
         self.nexon_lines = 0
         self.dtid2pos = defaultdict (list)
         self.dgid2tid = defaultdict (list)  
@@ -114,13 +127,16 @@ class gtf2 (object):
         
         self.gtf_file = gtf_file
 
-        print (f"Reading gtf {gtf_file}...", file=sys.stderr)
+        if self.verbose > 0:
+            print (f"Reading gtf {gtf_file}...", file=sys.stderr)
        
         with open(gtf_file, "r+b") as fgtf:
 
             self.mm = mmap.mmap(fgtf.fileno(), 0, prot=mmap.PROT_READ)
             
             iline = 0
+
+            no_transcript = True
 
             for line in iter(self.mm.readline, b""):
                 
@@ -149,9 +165,14 @@ class gtf2 (object):
                 pos = fgtf.tell() - len(line)
                 pos = self.mm.tell() - len(line)
 
-                self.dtid2pos[info_proc["transcript_id"]].append (pos) 
-
+                if info_proc["transcript_id"] == "":
+                    self.dtid2pos[info_proc["gene_id"]].append (pos) 
+                else:
+                    self.dtid2pos[info_proc["transcript_id"]].append (pos) 
+                
                 if feature == "transcript":
+
+                    no_transcript = False
                     
                     self.dgid2tid[info_proc["gene_id"]].append (info_proc["transcript_id"])
                     self.dgid2tid[info_proc["gene_name"]].append (info_proc["transcript_id"])
@@ -165,6 +186,12 @@ class gtf2 (object):
                     # if transcript feature not in gtf...
                     self.dtid2gid[info_proc["transcript_id"]] = info_proc["gene_id"]
                     self.dgid2name[info_proc["gene_id"]] = info_proc["gene_name"]
+                    
+                    if no_transcript:
+
+                        if not info_proc["transcript_id"] in self.dgid2tid[info_proc["gene_id"]]:
+                            self.dgid2tid[info_proc["gene_id"]].append (info_proc["transcript_id"])
+                    
 
 
                     self.dchromstart2tid[(chrom,start)] += info_proc["transcript_id"] + ","
@@ -181,8 +208,9 @@ class gtf2 (object):
                 elif feature == "stop_codon":
                     self.dtid2stopcodon[info_proc["transcript_id"]] = start if strand == "+" else end
 
-                
-            print (f"...found {self.nexon_lines} exons", file=sys.stderr)
+
+            if self.verbose > 0:  
+                print (f"...found {self.nexon_lines} exons", file=sys.stderr)
             
 
 
@@ -194,15 +222,15 @@ class gtf2 (object):
 
         positions = {}
 
-        for qi in q: 
+        for qi in q:
+            positions[qi] = self.dtid2pos[qi]
 
-            if qi in self.dgid2tid:
-                
-                for tid in self.dgid2tid[qi]:
-                    positions[tid] = self.dtid2pos[tid]
-
-            else:        
-                positions[qi] = self.dtid2pos[qi]
+        # for qi in q: 
+        #     if qi in self.dgid2tid:
+        #         for tid in self.dgid2tid[qi]:
+        #             positions[tid] = self.dtid2pos[tid]
+        #     else:        
+        #         positions[qi] = self.dtid2pos[qi]
 
         return gtf2_info (self, positions, feature)
     
@@ -214,7 +242,7 @@ class gtf2 (object):
             "gene_name":  ""}
 
         for i in info.split ("; "):
-            j = i.split (" ")
+            j = i.strip (" ").split (" ")
             if len(j) != 2:
                 continue            
             for n in r:
@@ -225,8 +253,8 @@ class gtf2 (object):
         return (r)
 
 
-    def get_coordinates (self, tid):    
-        return (self.fetch (tid, "exon").get_coordinates ())
+    #def get_coordinates (self, tid):    
+    #    return (self.fetch (tid, "exon").get_coordinates ())
     
     
     def get_name (self, tid):
@@ -281,9 +309,10 @@ class gtf2 (object):
 
     def get_all_gids (self):
 
-        for gid in self.dgid2name:
-            if gid != None:
-                yield (gid)
+        return [gid for gid in self.dgid2name if gid != None]
+        # for gid in self.dgid2name:
+        #     if gid != None:
+        #         yield (gid)
 
 
     def get_exon_coords (self, tid):
@@ -305,7 +334,6 @@ class gtf2 (object):
     def get_exons (self, tid):
 
         sorted_exons = self.get_exon_coords (tid)
-
         return ([s for (c,s,e,t) in sorted_exons], [e for (c,s,e,t) in sorted_exons])
 
 
@@ -313,4 +341,16 @@ class gtf2 (object):
 
         exons_s, exons_e = self.get_exons (tid)
         return (exons_e[:-1], exons_s[1:])
-        
+
+    def get_start (self, tid):
+        sorted_exons = self.get_exon_coords (tid)
+        return (min ([s for (c,s,e,t) in sorted_exons]))        
+
+    def get_end (self, tid):
+        sorted_exons = self.get_exon_coords (tid)
+        return (max ([e for (c,s,e,t) in sorted_exons]))        
+
+    def print (self, tid, feature):
+
+        self.fetch (tid, feature).print (feature)
+

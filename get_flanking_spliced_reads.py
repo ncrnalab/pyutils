@@ -19,7 +19,7 @@ import sys, os
 import glob
 from collections import defaultdict
 import argparse
-import mycigar
+#import mycigar
 import pysam
 
 dPos = defaultdict (list)
@@ -38,6 +38,9 @@ args = parser.parse_args()
 
 
 header = []
+
+print ("reading stdin...", file=sys.stderr)
+
 
 # read stdin file
 for line in sys.stdin:
@@ -61,11 +64,10 @@ for line in sys.stdin:
 
 
 # read spliced.bed files
-for jfile in args.files:
+for i, jfile in enumerate (args.files):
             
-    print ("reading", jfile, jfile[-3:], file=sys.stderr)
+    print ("reading", jfile, "-", i+1, "of", len (args.files), file=sys.stderr)
 
-    
     f = open(jfile, 'r')
     
     for line in f:
@@ -110,6 +112,9 @@ for jfile in args.files:
 
 
 # output
+
+print ("outputting...", file=sys.stderr)
+
 
 if args.sep_ss:
     output = header + ["total_SA", "total_SD"]

@@ -34,6 +34,10 @@ parser.add_argument('-o', "--output", dest='output', type=str, default="", help=
 parser.add_argument('-i', "--info", dest='info', type=str, default="", help='output for sample info')
 parser.add_argument("--verbose", dest='verbose', type=int, default=0, help='verbose')
 parser.add_argument('-db', "--database", dest='db', type=str, default="", help='database')
+parser.add_argument('-f', "--folder", dest='folder', type=str, default="", help='folder')
+
+parser.add_argument('-ow', "--overwrite", dest='overwrite', action='store_true', default=False, help='overwrite if exists')
+
 #parser.add_argument('-md5', dest='md5', type=str, default="md5sum.txt", help='md5 output file')
 
 parser.add_argument("-d", "--download", dest="download", help="Download data from GEO. If this option is not specified, only show metadata.", action="store_true", default=False)  
@@ -80,13 +84,14 @@ class uid:
 
 class dgeo:
 
-    def __init__(self, query = "", grep = "", vgrep = "", verbose=0):
+    def __init__(self, query = "", grep = "", vgrep = "", overwrite = False, verbose=0):
         self.dbs = ["arrayexpress", "ena", "ena_study", "gds", "sra"]
         self.found_id_db = ""
         self.grep = grep
         self.vgrep = vgrep
         self.query = query
         self.verbose = verbose
+        self.overwrite = overwrite
         self.md5sum = []
         #self.finfo = open (query + ".txt", "w")
         
@@ -122,23 +127,22 @@ class dgeo:
 
             elif db == "ena":
                             
-                esearch = self.get_xml (f'https://www.ebi.ac.uk/ena/portal/api/search?result=read_study&query=accession="{query}" OR sample_alias="{query}" OR study_alias="{query}"')
-                                 
+                url = f'https://www.ebi.ac.uk/ena/portal/api/search?result=read_study&fields=study_accession,study_alias&query=accession="{query}" OR sample_alias="{query}" OR study_alias="{query}"'
+                esearch = self.get_xml (url)
        
             elif db == "ena_study":
                 esearch = self.get_xml ("http://www.ebi.ac.uk/ena/data/search?query={}&result=study&display=xml".format (query))
                 # PROJECT STUDY: PR..... TODO
-
-       
 
             elif db == "arrayexpress":
                 # TODO
                 continue
 
             
-            
             if db == "ena":
 
+                print (url)
+                
                 print (esearch)
                 for r in esearch.split ("\n"):
 
@@ -148,8 +152,9 @@ class dgeo:
 
                     if cols[0] != "" and len (cols) > 1:
 
-                        print ("...found in", db, ": ", cols[1], file=sys.stderr)
+                        print ("...found in", db, ": ", cols[0], file=sys.stderr)
                         
+                        #gid_array.append (gid (db, cols[0], cols[1])) #r.attrs['accession'], r.attrs['alias']))
                         gid_array.append (gid (db, cols[0], cols[1])) #r.attrs['accession'], r.attrs['alias']))
 
                         self.found_in_db = db
@@ -409,13 +414,15 @@ class dgeo:
         return uri_array
         #for id in sampleIds:
 
-    def download (self, uri, download = False, foutput=None):
+    def download (self, uri, download = False, foutput=None, folder=""):
         
-                
-        folder = uri.sid.exp
 
-        if uri.sid.gid.alias[:3] == "GSE":
-            folder = uri.sid.gid.alias
+        if folder == "":        
+            folder = uri.sid.exp
+
+            print ("ALIAS", uri.sid.gid.alias, file=sys.stderr)
+            if uri.sid.gid.alias[:3] == "GSE":
+                folder = uri.sid.gid.alias
 
         folder += "/fastq"
                 
@@ -427,6 +434,8 @@ class dgeo:
             url = "ftp://" + url
 
 
+        dest = folder + "/" + os.path.basename (url) if uri.filename == "" else folder + "/" + uri.filename
+        
         if uri.filename == "":
             cmd = "wget -P {} {} #{}".format (folder, url, uri.desc)
         else:
@@ -434,18 +443,23 @@ class dgeo:
         
         print ("...", uri.desc, file=sys.stderr)
 
+        
+
         if self.verbose > 0:
             print (cmd, file=sys.stderr)
+            print ("dest:", dest, file=sys.stderr)
 
         if foutput != None:
             print (cmd, file=sys.stderr)
 
-        if (self.grep == "" or cmd.find (self.grep) != -1) and (self.vgrep == "" or cmd.find (self.vgrep) == -1): 
+        if (not os.path.exists(dest) or self.overwrite) and \
+           (self.grep == "" or cmd.find (self.grep) != -1) and \
+           (self.vgrep == "" or cmd.find (self.vgrep) == -1): 
+
+            if self.verbose > 0:
+                print ("READY FOR DOWNLOAD", file=sys.stderr) 
 
 
-
-
-            
             if download:
 
                 os.system (cmd)
@@ -497,7 +511,7 @@ if args.output != "":
 
 
 
-dg = dgeo (query = args.query, grep=args.grep, vgrep=args.vgrep, verbose=args.verbose)
+dg = dgeo (query = args.query, grep=args.grep, vgrep=args.vgrep, overwrite=args.overwrite, verbose=args.verbose)
 
 for eid_entry in dg.query2expId (args.query, dbs=args.db):
 
@@ -517,7 +531,7 @@ for eid_entry in dg.query2expId (args.query, dbs=args.db):
 
             #print >>sys.stderr, "uid", uid.uri
 
-            dg.download (uid_entry, download=args.download, foutput=foutput)
+            dg.download (uid_entry, download=args.download, foutput=foutput, folder=args.folder)
 
 
 
