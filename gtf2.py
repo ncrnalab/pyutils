@@ -117,6 +117,7 @@ class gtf2 (object):
         self.dgid2tid = defaultdict (list)  
         self.dgid2name = defaultdict (str)  
         self.dtid2gid = defaultdict (str)  
+        self.dtid2type = defaultdict (str)  
         self.dchromstart2tid = defaultdict (str)  
         self.dchromend2tid = defaultdict (str)  
         self.dtid2startcodon = defaultdict (int)  
@@ -180,6 +181,8 @@ class gtf2 (object):
                     self.dtid2gid[info_proc["transcript_id"]] = info_proc["gene_id"]
                     self.dgid2name[info_proc["gene_id"]] = info_proc["gene_name"]
 
+                    self.dtid2type[info_proc["transcript_id"]] = info_proc["transcript_type"]
+                    
 
                 elif feature == "exon":
 
@@ -192,8 +195,6 @@ class gtf2 (object):
                         if not info_proc["transcript_id"] in self.dgid2tid[info_proc["gene_id"]]:
                             self.dgid2tid[info_proc["gene_id"]].append (info_proc["transcript_id"])
                     
-
-
                     self.dchromstart2tid[(chrom,start)] += info_proc["transcript_id"] + ","
                     self.dchromend2tid[(chrom,end)] += info_proc["transcript_id"] + ","
 
@@ -239,7 +240,8 @@ class gtf2 (object):
     
         r = {"gene_id": "", \
             "transcript_id":  "", \
-            "gene_name":  ""}
+            "gene_name":  "",
+            "transcript_type": ""}
 
         for i in info.split ("; "):
             j = i.strip (" ").split (" ")
@@ -262,6 +264,8 @@ class gtf2 (object):
         gid = self.dtid2gid[tid]
         return (self.dgid2name[gid])
 
+    def get_type (self, tid):
+        return (self.dtid2type[tid])
 
     def get_gene_id (self, tid):        
         return (self.dtid2gid[tid])
