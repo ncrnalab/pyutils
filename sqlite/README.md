@@ -2,8 +2,6 @@
 
 To convert UCSC SQL tables to local sqlite files, first dump SQL file using mysqldump (here using hg38 repeatmask table as an example):
 
-*Download sql*
- 
 ``` bash
 
 mysqldump --skip-lock-tables --skip-extended-insert --compact -u genome -h genome-mysql.soe.ucsc.edu hg38 rmsk > hg38.rmsk.sql
