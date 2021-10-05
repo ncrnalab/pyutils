@@ -39,6 +39,7 @@ Options:
 
 Finally, to retrieve flanking alu distances (or other repetitive element): 
 
+
 **annotate_repeat.py**
  
 ``` python
@@ -50,6 +51,8 @@ Options:
   -rdf <string>     Comma-separated string of repeat families to analyze (default=Alu)
   
 ```
+
+Help to retrieve and convert UCSC repeatmask tables to sqlite can be found in the *sqlite* sub-folder.
 
 
 #### Example
